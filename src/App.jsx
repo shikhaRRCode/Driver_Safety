@@ -27,6 +27,8 @@ function Icon({ name, size = 24, strokeWidth = 2.2, ...props }) {
     arrow: <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,
     check: <path d="m5 12 4 4L19 6"/>,
     close: <path d="m18 6-12 12M6 6l12 12"/>,
+    camera: <><path d="M14.5 4.5 13 7H8a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6a3 3 0 0 0-3-3h-1.1"/><circle cx="12" cy="13" r="3"/><path d="M7.5 10h.01"/></>,
+    document: <><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h6M9 20h3"/></>,
   };
   return <svg {...common}>{paths[name] || paths.alert}</svg>;
 }
@@ -93,6 +95,14 @@ const initialForm = {
   cargoStatus: 'Normal',
 };
 
+const initialDetails = {
+  description: 'Minor collision with another vehicle on the highway. Front bumper damaged.',
+  peopleInvolved: '2',
+  safetyCritical: 'No',
+  photoUrl: '',
+  photoName: '',
+};
+
 function SelectField({ id, label, value, options, onChange, highlight = false }) {
   return (
     <div className="form-field">
@@ -151,6 +161,146 @@ function ReportScreen({ onBack, onNext }) {
   );
 }
 
+function DetailsScreen({ report, onBack, onSubmit }) {
+  const [details, setDetails] = useState(initialDetails);
+  const update = (key, value) => setDetails(current => ({ ...current, [key]: value }));
+  const handlePhoto = event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDetails(current => ({
+        ...current,
+        photoUrl: reader.result,
+        photoName: file.name,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="screen-body form-screen-body details-screen-body">
+      <header className="form-header">
+        <button type="button" className="form-back" aria-label="Back to report form" onClick={onBack}><Icon name="back" size={24} /></button>
+        <h1>Additional Details</h1>
+        <span className="header-spacer" />
+      </header>
+
+      <form className="details-form" onSubmit={e => { e.preventDefault(); onSubmit({ ...report, ...details }); }}>
+        <div className="form-field">
+          <label htmlFor="description">Description<span className="required-mark">*</span></label>
+          <textarea id="description" value={details.description} onChange={e => update('description', e.target.value)} rows={4} />
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="peopleInvolved">People Involved<span className="required-mark">*</span></label>
+          <input className="text-control" id="peopleInvolved" type="number" min="0" value={details.peopleInvolved} onChange={e => update('peopleInvolved', e.target.value)} />
+        </div>
+
+        <div className="form-field">
+          <label>Safety Critical<span className="required-mark">*</span></label>
+          <div className="critical-toggle" role="group" aria-label="Safety critical">
+            {['Yes', 'No'].map(option => (
+              <button key={option} type="button" className={details.safetyCritical === option ? 'active' : ''} onClick={() => update('safetyCritical', option)}>
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <section className="evidence-section" aria-label="Photos and evidence">
+          <h2>Add Photos / Evidence</h2>
+          <div className="evidence-grid">
+            <label className={`evidence-preview ${details.photoUrl ? 'has-photo' : ''}`}>
+              <input type="file" accept="image/*" onChange={handlePhoto} />
+              {details.photoUrl
+                ? <img src={details.photoUrl} alt="Selected evidence preview" />
+                : <>
+                    <Icon name="camera" size={30} strokeWidth={2.1} />
+                    <span>Choose Photo</span>
+                  </>}
+            </label>
+            <label className="add-photo-button">
+              <input type="file" accept="image/*" onChange={handlePhoto} />
+              <Icon name="camera" size={30} strokeWidth={2.1} />
+              <span>{details.photoName || 'Add Photo'}</span>
+            </label>
+          </div>
+        </section>
+
+        <div className="details-actions">
+          <button className="secondary-button" type="button" onClick={onBack}><Icon name="back" size={17} /> Back</button>
+          <button className="submit-button" type="submit">Submit Incident</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SubmittedScreen({ incident, onHome, onEdit }) {
+  const rows = [
+    ['Driver', incident.driver],
+    ['Vehicle', incident.vehicle],
+    ['Route', incident.route],
+    ['Incident Type', incident.incidentType],
+    ['Location', incident.location],
+    ['Date & Time', `${incident.date} · ${incident.time}`],
+    ['Vehicle Condition', incident.vehicleCondition],
+    ['Cargo Status', incident.cargoStatus],
+    ['People Involved', incident.peopleInvolved],
+    ['Safety Critical', incident.safetyCritical],
+    ['Photo Evidence', incident.photoName || 'No photo attached'],
+  ];
+
+  return (
+    <div className="screen-body submitted-body">
+      <header className="form-header">
+        <button type="button" className="form-back" aria-label="Edit submitted incident" onClick={onEdit}><Icon name="back" size={24} /></button>
+        <h1>Incident Submitted</h1>
+        <span className="header-spacer" />
+      </header>
+
+      <main className="submitted-content">
+        <section className="success-panel" aria-live="polite">
+          <span className="success-icon"><Icon name="check" size={34} strokeWidth={3} /></span>
+          <div>
+            <h2>Form submitted</h2>
+            <p>Your incident report is visible below.</p>
+          </div>
+        </section>
+
+        <section className="submitted-card">
+          <div className="submitted-card-title">
+            <Icon name="document" size={21} />
+            <h2>Submitted Incident Details</h2>
+          </div>
+          <dl className="summary-list">
+            {rows.map(([label, value]) => (
+              <div key={label} className="summary-row">
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="description-summary">
+            <span>Description</span>
+            <p>{incident.description}</p>
+          </div>
+          {incident.photoUrl && (
+            <div className="submitted-photo">
+              <span>Evidence Photo</span>
+              <img src={incident.photoUrl} alt="Submitted evidence" />
+            </div>
+          )}
+        </section>
+
+        <button className="next-button home-return-button" type="button" onClick={onHome}>Back to Home</button>
+      </main>
+    </div>
+  );
+}
+
 function BottomNav({ onNotice }) {
   const items = [
     { label: 'Home', icon: 'home', active: true },
@@ -172,20 +322,36 @@ function BottomNav({ onNotice }) {
 function App() {
   const [screen, setScreen] = useState('home');
   const [notice, setNotice] = useState('');
+  const [reportForm, setReportForm] = useState(initialForm);
+  const [submittedIncident, setSubmittedIncident] = useState(null);
 
-  const showNotice = () => setNotice('This prototype includes only Home and Report Incident screens.');
+  const showNotice = () => setNotice('This prototype includes the driver incident reporting flow.');
   const goHome = () => { setScreen('home'); setNotice(''); };
   const goToForm = () => { setScreen('form'); setNotice(''); };
-  const nextPreview = () => setNotice('UI preview only — no incident was submitted to ServiceNow.');
+  const goToDetails = form => {
+    setReportForm(form);
+    setScreen('details');
+    setNotice('');
+  };
+  const submitIncident = incident => {
+    setSubmittedIncident(incident);
+    setScreen('submitted');
+    setNotice('');
+  };
+
+  const renderScreen = () => {
+    if (screen === 'home') return <HomeScreen onStartReport={goToForm} onNotice={showNotice} />;
+    if (screen === 'form') return <ReportScreen onBack={goHome} onNext={goToDetails} />;
+    if (screen === 'details') return <DetailsScreen report={reportForm} onBack={() => setScreen('form')} onSubmit={submitIncident} />;
+    return <SubmittedScreen incident={submittedIncident || { ...reportForm, ...initialDetails }} onHome={goHome} onEdit={() => setScreen('details')} />;
+  };
 
   return (
     <div className="app-stage">
-      <div className={`app-device ${screen === 'form' ? 'form-device' : ''}`}>
+      <div className={`app-device ${screen !== 'home' ? 'form-device' : ''}`}>
         <StatusBar />
         <div className="app-screen">
-          {screen === 'home'
-            ? <HomeScreen onStartReport={goToForm} onNotice={showNotice} />
-            : <ReportScreen onBack={goHome} onNext={nextPreview} />}
+          {renderScreen()}
         </div>
         <div className="system-nav" aria-hidden="true"><span className="system-back"/><span className="system-home"/><span className="system-recents"/></div>
       </div>
